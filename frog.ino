@@ -1,168 +1,211 @@
-int In1Pin_1 = 9;
-int In2Pin_1 = 10;
-int PWMPin_1 = 3;
+//  OpenFrog project by Moreschi Simone -moreschisimone@gmail.com-
+//
+// Using Arduino UNO
+// From 2014
 
-int In1Pin_2 = 11;
-int In2Pin_2 = 12;
-int PWMPin_2 = 5;
 
+//  Pins for left wheel
+//
+//  Pin 0-255 for go forward
+int left_wheel_pin_forward = 9;
+//  Pin 0-255 for go backward
+int left_wheel_pin_backward = 10;
+//  Pin 0-255 for speed
+int left_wheel_pin_speed = 3;
+
+//  Pins for right wheel
+//
+//  Pin 0-255 for go forward
+int right_wheel_pin_forward = 12;
+//  Pin 0-255 for go backward
+int right_wheel_pin_backward = 11;
+//  Pin 0-255 for speed
+int right_wheel_pin_speed = 5;
+
+
+
+//  HC-SR04 (Distance sensor)
+//
 int triggerPort = 7;
 int echoPort = 8;
-int ledPort = 2;
+
+
+
+//  Led port for STOP lights
+//
+int stops_led_pin = 2;
+
+
+
+//  Pin for on/off button
+//
 int buttonPin = 4;
+
+
+//  Pin for system on/off (Using button pin 4)
+//
 int powerLedPin = 13;
 
-int pending = 6;
-boolean fermati = false;
-boolean attivo = false;
+
+//  System variables
+//
+boolean stopRobot = false;
+boolean systemOn = false;
+int currentSecureDistance = 0;
 
 //  Parameters
 //
-int totPending = 6;
-int maxSpeed = 140;
-int turnSpeed = 120;
-int currentSecureDistance = 0;
-int secureDistance = 15;
-int turnSecureDistance = 40;
-int timeBeforeTurn = 1000;
+//  Basic settings
+int maxSpeed = 140;  //  Speed when robot go forward (0-255)
+int turnSpeed = 120;  //  Speed when robot turn right/left (0-255)
+int secureDistance = 15;  //  cm
+int turnSecureDistance = 40;  //  cm
+int timeBeforeTurn = 1000;  //  Time in milliseconds for start turn when robot detect obstacles and stops
 
-
-// the setup routine runs once when you press reset:
+//  Advanced settings
+//
+int pending = 6;  //  Current number of pending turn action 
+int totPending = 6;   //  Minimum number of arduino loops for turn the robot when detect obstacles. After this number of loops robot continue to detect distance for detect if it can go forward or continue to turn for avoid obstacles. The degrees the robot turns depends from: this variables, turn speed and main loop delay.
+          
+//  Seup the arduino ONE board
+//
 void setup() {                
-  
-  attivo = false;
-  
+ 
+  systemOn = false;
   currentSecureDistance = secureDistance;
   
-  //  Sensors ports
+  //  Setting up pins
+  //
   pinMode(buttonPin, INPUT);
   pinMode(powerLedPin, OUTPUT);
-  pinMode( triggerPort, OUTPUT );
-  pinMode( echoPort, INPUT );
-  pinMode( ledPort, OUTPUT );
+  pinMode(triggerPort, OUTPUT );
+  pinMode(echoPort, INPUT );
+  pinMode(stops_led_pin, OUTPUT );
+  pinMode(left_wheel_pin_forward, OUTPUT);
+  pinMode(left_wheel_pin_backward, OUTPUT);
+  pinMode(left_wheel_pin_speed, OUTPUT);
+  pinMode(right_wheel_pin_backward, OUTPUT);
+  pinMode(right_wheel_pin_forward, OUTPUT);
+  pinMode(right_wheel_pin_speed, OUTPUT);
   
-  //  Ruota sinistra
-  //
-  pinMode(In1Pin_1, OUTPUT);
-  pinMode(In2Pin_1, OUTPUT);
-  pinMode(PWMPin_1, OUTPUT);
-  
-  //  Ruota destra
-  //
-  pinMode(In1Pin_2, OUTPUT);
-  pinMode(In2Pin_2, OUTPUT);
-  pinMode(PWMPin_2, OUTPUT);
-  
-  Serial.begin( 9600 );
-  
+  Serial.begin( 9600 );  
 }
 
-// the loop routine runs over and over again forever:
+
+//  Arduino loop
+//
 void loop() {
   
- boolean buttonState = digitalRead(buttonPin); 
- if (buttonState == HIGH) {     
-    // turn LED on:    
-    if (!attivo) {
-      attivo = true;
-      digitalWrite(powerLedPin, HIGH);  
-    } else {
-      
-      attivo = false;
-      currentSecureDistance = secureDistance;
-      
-      digitalWrite(ledPort, LOW);
-      
-      digitalWrite(In1Pin_1, HIGH);
-      digitalWrite(In2Pin_1, HIGH);
-      analogWrite(PWMPin_1, 0);
-      digitalWrite(In1Pin_2, HIGH);
-      digitalWrite(In2Pin_2, HIGH);
-      analogWrite(PWMPin_2, 0);
-    
-      digitalWrite(powerLedPin, LOW);  
-      delay(1000);
-    }
-  } 
+   boolean buttonState = digitalRead(buttonPin); 
+   
+   //  If button is pressing now, check the button state, if button is not pressed in this moment jump this code
+   //
+   if (buttonState == HIGH) {     
+  
+      // System is ON, turn arduino systemON led to ON
+      //
+      if (!systemOn) {
+        
+        systemOn = true;
+        digitalWrite(powerLedPin, HIGH);  
+        
+      } else {
+        
+        systemOn = false;
+        currentSecureDistance = secureDistance;
+        
+        digitalWrite(stops_led_pin, LOW);
+        digitalWrite(left_wheel_pin_forward, HIGH);
+        digitalWrite(left_wheel_pin_backward, HIGH);
+        analogWrite(left_wheel_pin_speed, 0);
+        digitalWrite(right_wheel_pin_backward, HIGH);
+        digitalWrite(right_wheel_pin_forward, HIGH);
+        analogWrite(right_wheel_pin_speed, 0);
+        digitalWrite(powerLedPin, LOW);  
+        delay(1000);
+      }
+    } 
  
   
-  if (attivo) {
-  
-  //porta bassa l'uscita del trigger
-  digitalWrite( triggerPort, LOW );
-  delayMicroseconds(2);
-  digitalWrite( triggerPort, HIGH );
-  delayMicroseconds( 10 );
-  digitalWrite( triggerPort, LOW );
-  long duration = pulseIn( echoPort, HIGH );
-  long r = (duration / 2)/29.1;
-  Serial.print( "durata: " );
-  Serial.print( duration );
-  Serial.print( " , " );
-  Serial.print( "distanza: " );
-  
-  
-  
-  Serial.print( r );
-  Serial.println( "cm" );
-  if (r <= currentSecureDistance) {
-    fermati = true;
-    digitalWrite(ledPort, HIGH);
-  } else {
-    fermati = false;
-    digitalWrite(ledPort, LOW);
-  }
-  
-  
-  if (!fermati && pending == 0) {
+    //  System is ON detect obstacles and move robot!
+    //
+    if (systemOn) {
     
-    currentSecureDistance = secureDistance;
+        //  Get distance from obstacle
+        //
+        digitalWrite( triggerPort, LOW );
+        delayMicroseconds(2);
+        digitalWrite( triggerPort, HIGH );
+        delayMicroseconds(10);
+        digitalWrite( triggerPort, LOW );
+        long duration = pulseIn( echoPort, HIGH );
+        long r = (duration / 2) / 29.1;
+        Serial.print( "Distance from obstacle is: " );
+        Serial.print( r );
+        Serial.println( "cm" );
+        if (r <= currentSecureDistance) {
+          stopRobot = true;
+          digitalWrite(stops_led_pin, HIGH);
+        } else {
+          stopRobot = false;
+          digitalWrite(stops_led_pin, LOW);
+        }
+  
+        
+        if (!stopRobot && pending == 0) {
+          
+            //  No obstacles detected and no turn action pending, go forward!
+            //
+            currentSecureDistance = secureDistance;
+            
+            digitalWrite(left_wheel_pin_forward, HIGH);
+            digitalWrite(left_wheel_pin_backward, LOW);
+            analogWrite(left_wheel_pin_speed, maxSpeed);
+            
+            digitalWrite(right_wheel_pin_forward, HIGH);
+            digitalWrite(right_wheel_pin_backward, LOW);
+            analogWrite(right_wheel_pin_speed, maxSpeed);
+          
+          
+        } else {
     
-    digitalWrite(In1Pin_1, HIGH);
-    digitalWrite(In2Pin_1, LOW);
-    analogWrite(PWMPin_1, maxSpeed);
-    
-    digitalWrite(In1Pin_2, LOW);
-    digitalWrite(In2Pin_2, HIGH);
-    analogWrite(PWMPin_2, maxSpeed);
-    
-    
-  } else {
-    
-    if (currentSecureDistance == secureDistance) {
-      digitalWrite(In1Pin_1, HIGH);
-      digitalWrite(In2Pin_1, HIGH);
-      analogWrite(PWMPin_1, 0);
-      digitalWrite(In1Pin_2, HIGH);
-      digitalWrite(In2Pin_2, HIGH);
-      analogWrite(PWMPin_2, 0);
-      delay(timeBeforeTurn);
+            if (currentSecureDistance == secureDistance) {
+                //  Stop the wheels, HUB-ee wheels have break mode, set ON forward and backward direction, set speed = 0. In this way if your robot is not in horyzontal position don't move.
+                //
+                digitalWrite(left_wheel_pin_forward, HIGH);
+                digitalWrite(left_wheel_pin_backward, HIGH);
+                analogWrite(left_wheel_pin_speed, 0);
+                digitalWrite(right_wheel_pin_backward, HIGH);
+                digitalWrite(right_wheel_pin_forward, HIGH);
+                analogWrite(right_wheel_pin_speed, 0);
+                delay(timeBeforeTurn);
+                
+                //  Set number of minimum loop for turn the robot left
+                //
+                pending = totPending;
+            }
       
-      pending = totPending;
-    }
+            pending--;
+            if (pending < 0) {
+              pending = 0;
+            }
     
-    pending--;
+            currentSecureDistance = turnSecureDistance;
     
-    Serial.print( pending );
-    
-    
-    if (pending < 0) {
-      pending = 0;
-    }
-    
-    
-    currentSecureDistance = turnSecureDistance;
-    
-    digitalWrite(In1Pin_1, HIGH);
-    digitalWrite(In2Pin_1, HIGH);
-    analogWrite(PWMPin_1, 0);
-    
-    digitalWrite(In1Pin_2, HIGH);
-    digitalWrite(In2Pin_2, LOW);
-    analogWrite(PWMPin_2, turnSpeed);
-  }
+            //  Turn the robot left
+            //
+            digitalWrite(left_wheel_pin_forward, HIGH);
+            digitalWrite(left_wheel_pin_backward, HIGH);
+            analogWrite(left_wheel_pin_speed, 0);
+            
+            digitalWrite(right_wheel_pin_backward, HIGH);
+            digitalWrite(right_wheel_pin_forward, LOW);
+            analogWrite(right_wheel_pin_speed, turnSpeed);
+      }
 
-  delay(200);
+      //  Main delay
+      //
+      delay(200);
   
   }
 
